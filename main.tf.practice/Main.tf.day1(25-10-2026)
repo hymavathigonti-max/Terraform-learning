@@ -1,0 +1,13 @@
+resource "aws_instance" "myserver" {
+    tags = {
+        Name = "terraform"
+        Environment = "Dev"
+        client = "Top-2"
+        Project = "Terraform"
+    }
+    ami = "ami-04b938437b69a2c9c"
+    availability_zone = "us-east-1b"
+    root_block_device {
+        volume_size = 10
+    }
+}

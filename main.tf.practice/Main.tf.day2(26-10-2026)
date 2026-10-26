@@ -1,0 +1,23 @@
+resource "aws_instance" "ONE" {
+    tags = {
+        # Name = "amazon-${count.index+1}" //count function startes indes from 1 and do +1 
+        # Name = "${each.key}" // for-each function call each name and create
+         Name = "Dev-server"
+    }
+    ami = "ami-04b938437b69a2c9c"
+    # count = 3
+    # for_each = toset(["Dev-server", "test-server", "prod-server"])
+    instance_type = "t3.micro"
+    availability_zone = "us-east-1a"
+
+    lifecycle  {
+           # prevent_destroy = true
+           # ignore_changes = all // for all changes 
+          /* ignore changes = [
+    tags["Environment"], # Ignores changes to just this tag
+    ami,                 # Ignores if someone updates the image ID in the cloud
+  ]
+  */
+    # create_before_destroy = true
+         }
+}
