@@ -1,0 +1,89 @@
+resource "aws_vpc" "main_vpc" {
+cidr_block = "10.0.0.0/16"
+enable_dns_hostnames = true
+
+tags = {
+    Name = "My-VPC"
+}
+}
+resource "aws_subnet" "subnet_a" {
+    vpc_id            = aws_vpc.main_vpc.id # Added: Links subnet to the VPC
+    cidr_block = "10.0.1.0/24"
+    availability_zone = "us-east-1a"
+
+    tags = {
+        Name = "SUBNET-A"
+    }
+}
+resource "aws_subnet" "subnet_b" {
+    vpc_id            = aws_vpc.main_vpc.id # Added: Links subnet to the VPC
+    cidr_block = "10.0.2.0/24"
+    availability_zone = "us-east-1b"
+
+    tags = {
+        Name = "SUBNET-B"
+    }
+}
+
+# Data source to automatically pull the latest Amazon Linux 2023 AMI ID
+data "aws_ami" "amazon_linux_latest" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023*-x86_64"]
+  }
+}
+
+# Server inside SUBNET-A --- creating server inside my subnet-a
+
+resource "aws_instance" "server_a" {
+  ami               = data.aws_ami.amazon_linux_latest.id
+  instance_type     = "t3.micro"
+  subnet_id         = aws_subnet.subnet_a.id
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name        = "Server-A"
+    Environment = "Dev-Server"
+    Project     = "Terraform-practice"
+  }
+
+   # 3. ADD PREVENT DESTROY AND IGNORE CHANGES BOTH
+  lifecycle {
+    # prevent_destroy = true
+    ignore_changes  = all
+    /*
+    [
+      tags["Environment"], # Terraform will ignore manual cloud changes to this tag
+    ]
+    */
+  }
+}
+
+# Server inside SUBNET-B -- creating my second server in subnet-b
+
+resource "aws_instance" "server_b" {
+  ami               = data.aws_ami.amazon_linux_latest.id
+  instance_type     = "t3.micro"
+  subnet_id         = aws_subnet.subnet_b.id
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name        = "Server-B"
+    Environment = "Dev"
+    Project     = "Terraform-practice"
+  }
+
+  # 3. ADD PREVENT DESTROY AND IGNORE CHANGES BOTH  --adding life cycle arguments 
+
+  lifecycle {
+    # prevent_destroy = true
+    ignore_changes  = all
+    /*
+    [
+      tags["Environment"],
+    ]
+    */
+  }
+}
