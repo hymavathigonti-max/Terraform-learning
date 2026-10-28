@@ -1,12 +1,11 @@
-# ==========================================
 # 1. VPC AND SUBNETS
-# ==========================================
+
 resource "aws_vpc" "main_vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
 
   tags = {
-    Name = "My-VPC"
+    Name = "Web-Server-VPC"
   }
 }
 
@@ -33,6 +32,7 @@ resource "aws_subnet" "subnet_b" {
 }
 
 # Data source to pull the latest Ubuntu 24.04 LTS AMI ID
+
 data "aws_ami" "ubuntu_latest" {
   most_recent = true
   owners      = ["099720109477"] # Canonical owner ID for official Ubuntu AMIs
@@ -42,9 +42,9 @@ data "aws_ami" "ubuntu_latest" {
   }
 }
 
-# ==========================================
+
 # 3. INTERNET GATEWAY & ROUTE TABLES
-# ==========================================
+
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main_vpc.id
 
@@ -76,9 +76,9 @@ resource "aws_route_table_association" "b" {
   route_table_id = aws_route_table.public_rt.id
 }
 
-# ==========================================
+
 # SECURITY GROUPS
-# ==========================================
+
 resource "aws_security_group" "alb_sg" {
   name        = "alb-security-group"
   description = "Allow HTTP inbound traffic"
@@ -119,36 +119,56 @@ resource "aws_security_group" "server_sg" {
   }
 }
 
-# ==========================================
 # 2. SERVERS (UBUNTU WITH UPDATED LIFECYCLE)
-# ==========================================
+
 resource "aws_instance" "server_a" {
   ami                    = data.aws_ami.ubuntu_latest.id
   instance_type          = "t3.micro"
   subnet_id              = aws_subnet.subnet_a.id
   availability_zone      = "us-east-1a"
   vpc_security_group_ids = [aws_security_group.server_sg.id]
-  associate_public_ip_address = true # FIXED: Force instance to get public IP for internet access
+  associate_public_ip_address = true
 
-  user_data = <<-EOF
+     
+ user_data = <<-EOF
               #!/bin/bash
+              # 1. Update system and install required tools
               sudo apt-get update -y
-              sudo apt-get install -y apache2
-              sudo systemctl start apache2
-              sudo systemctl enable apache2
-              echo "<h1>Hello from Ubuntu Server A</h1>" > /var/www/html/index.html
+              sudo apt-get install nginx git -y
+
+              # 2. Start and enable Nginx web server
+              sudo systemctl start nginx
+              sudo systemctl enable nginx
+
+              # 3. Clean up default Nginx placeholder files
+              sudo rm -rf /var/www/html/*
+
+              # 4. Clone the repository into /tmp folder
+              cd /tmp
+              git clone https://github.com/Ironhack-Archive/online-clone-amazon.git
+
+              # 5. Move all files directly into the web server directory
+              sudo cp -r /tmp/online-clone-amazon/. /var/www/html/
+
+              # 6. Set correct permissions so Nginx can read the files
+              sudo chown -R www-data:www-data /var/www/html/
+              sudo chmod -R 755 /var/www/html/
+              
+              # 7. Restart Nginx to pick up the changes
+              sudo systemctl restart nginx
               EOF
 
   tags = {
-    Name        = "Server-A"
+    Name        = "Amazon-vm-A"
     Environment = "Dev-Server"
     Project     = "Terraform-practice"
   }
 
   # 5. ADD PREVENT DESTROY AND IGNORE CHANGES
+
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [tags]
+    #ignore_changes  = [tags]
   }
 }
 
@@ -158,33 +178,55 @@ resource "aws_instance" "server_b" {
   subnet_id              = aws_subnet.subnet_b.id
   availability_zone      = "us-east-1b"
   vpc_security_group_ids = [aws_security_group.server_sg.id]
-  associate_public_ip_address = true # FIXED: Force instance to get public IP for internet access
+  associate_public_ip_address = true 
 
-  user_data = <<-EOF
+     
+
+   user_data = <<-EOF
               #!/bin/bash
+              # 1. Update system and install required tools
               sudo apt-get update -y
-              sudo apt-get install -y apache2
-              sudo systemctl start apache2
-              sudo systemctl enable apache2
-              echo "<h1>Hello from Ubuntu Server B</h1>" > /var/www/html/index.html
+              sudo apt-get install nginx git -y
+
+              # 2. Start and enable Nginx web server
+              sudo systemctl start nginx
+              sudo systemctl enable nginx
+
+              # 3. Clean up default Nginx placeholder files
+              sudo rm -rf /var/www/html/*
+
+              # 4. Clone the repository into /tmp folder
+              cd /tmp
+              git clone https://github.com/Ironhack-Archive/online-clone-amazon.git
+
+              # 5. Move all files directly into the web server directory
+              sudo cp -r /tmp/online-clone-amazon/. /var/www/html/
+
+              # 6. Set correct permissions so Nginx can read the files
+              sudo chown -R www-data:www-data /var/www/html/
+              sudo chmod -R 755 /var/www/html/
+              
+              # 7. Restart Nginx to pick up the changes
+              sudo systemctl restart nginx
               EOF
 
   tags = {
-    Name        = "Server-B"
-    Environment = "Dev"
+    Name        = "Amazon-vm-B"
+    Environment = "Test"
     Project     = "Terraform-practice"
   }
 
   # 5. ADD PREVENT DESTROY AND IGNORE CHANGES
+
   lifecycle {
     prevent_destroy = true
-    ignore_changes  = [tags]
+    #ignore_changes  = [tags]
   }
 }
 
-# ==========================================
+
 # 4. LOAD BALANCER & TARGET GROUPS
-# ==========================================
+
 resource "aws_lb" "main_alb" {
   name               = "main-application-load-balancer"
   internal           = false
@@ -237,10 +279,10 @@ resource "aws_lb_target_group_attachment" "attach_server_b" {
   port             = 80
 }
 
-# ==========================================
+
 # 6. OUTPUT ELB DNS
-# ==========================================
-output "elb_dns_name" {
-  description = "The DNS name of the load balancer"
-  value       = aws_lb.main_alb.dns_name
+
+output "elb_dns_name" {   # Declares a public print evaluation data lookup query parameter block named elb_dns_name
+  description = "The DNS name of the load balancer"  # Provides contextual tooltips documentation outlining what this variable displays
+  value       = aws_lb.main_alb.dns_name  # Extracts the newly provisioned fully qualified network tracking domain string address
 }
